@@ -46,7 +46,8 @@ def make_beta_schedule(schedule, n_timestep, linear_start=1e-4, linear_end=2e-2,
 def make_ddim_timesteps(ddim_discr_method, num_ddim_timesteps, num_ddpm_timesteps, verbose=True):
     if ddim_discr_method == 'uniform':
         c = num_ddpm_timesteps // num_ddim_timesteps
-        ddim_timesteps = np.asarray(list(range(0, num_ddpm_timesteps, c)))
+        # ddim_timesteps = np.asarray(list(range(0, num_ddpm_timesteps, c)))
+        ddim_timesteps = (np.arange(0, num_ddim_timesteps) * c).astype(int)
     elif ddim_discr_method == 'quad':
         ddim_timesteps = ((np.linspace(0, np.sqrt(num_ddpm_timesteps * .8), num_ddim_timesteps)) ** 2).astype(int)
     else:
@@ -261,7 +262,11 @@ class HybridConditioner(nn.Module):
         return {'c_concat': [c_concat], 'c_crossattn': [c_crossattn]}
 
 
-def noise_like(shape, device, repeat=False):
+def noise_like(shape, device, repeat=False, add_offset_noise=True):
     repeat_noise = lambda: torch.randn((1, *shape[1:]), device=device).repeat(shape[0], *((1,) * (len(shape) - 1)))
+
+    # Using info from https://www.crosslabs.org//blog/diffusion-with-offset-noise
+    offset_noise = lambda: 0.1 * torch.randn(shape[0], shape[1], 1, 1, device=device) if add_offset_noise else 0
     noise = lambda: torch.randn(shape, device=device)
-    return repeat_noise() if repeat else noise()
+
+    return repeat_noise() if repeat else noise() + offset_noise()
